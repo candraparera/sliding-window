@@ -8,6 +8,7 @@
 #include "segment.h"
 #include "util.h"
 #include "buffer.h"
+#include "const.h"
 
 const int TIMEOUT = 1;
 
@@ -17,10 +18,6 @@ void init_socket(int *sockfd) {
         die("Cannot creating socket instance");
     printf("%d socket descriptor created\n", (int) time(0));
     fflush(stdout);
-
-    // configure buffer size
-    // setsockopt(*sockfd, SOL_SOCKET, SO_SNDBUF, buffer_size, sizeof(*buffer_size));
-    // setsockopt(*sockfd, SOL_SOCKET, SO_RCVBUF, buffer_size, sizeof(*buffer_size));
 }
 
 void init_address(int port, char* ip_address, struct sockaddr_in *address) {
@@ -32,11 +29,11 @@ void init_address(int port, char* ip_address, struct sockaddr_in *address) {
 
 char send_segment(socket_buffer* send_buffer, int seqnum, char data, char eof) {
     segment seg;
-    seg.soh = '\01';
+    seg.soh = SOH;
     seg.seq = seqnum;
-    seg.stx = '\02';
+    seg.stx = STX;
     seg.data = data;
-    seg.etx = eof ? '\04' : '\03';
+    seg.etx = eof ? EOT : ETX;
     
     char buffer[10];
     segment_to_raw(seg, buffer);
@@ -67,6 +64,9 @@ int main(int argc, char** argv) {
     int buffer_size = to_int(argv[3]);
     char* recv_addr = argv[4];
     int port = to_int(argv[5]);
+
+    if (buffer_size < 7)
+        die("buffer size should be more than 7 bytes");
 
     // init socket
     init_socket(&sockfd);

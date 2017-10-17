@@ -8,6 +8,7 @@
 #include "segment.h"
 #include "util.h"
 #include "buffer.h"
+#include "const.h"
 
 void init_socket(int port, int *sockfd) {
     // create a UDP socket
@@ -38,7 +39,7 @@ void send_ack_segment(socket_buffer* send_buffer, char ack, int seq_num, int win
     ack_segment seg;
     char raw[16];
 
-    seg.ack = ack ? '\06' : '\21';
+    seg.ack = ack ? ACK : NAK;
     seg.next_seq = seq_num;
     seg.window_size = window_size;
     ack_segment_to_raw(seg, raw);
@@ -50,7 +51,6 @@ void send_ack_segment(socket_buffer* send_buffer, char ack, int seq_num, int win
 
     ack_segment_to_raw(seg, raw);
     send_data(send_buffer, raw, 7, 1);
-    // sendto(sockfd, raw, 7, 0, address, sizeof(*address));
 }
  
 int main(int argc, char** argv) {
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
             die("Some error occured when reading buffer");
 
         // check, is this a segment?
-        if (len >= 9 && *buff == '\01' && *(buff+5) == '\02' && (*(buff+7) == '\03' || *(buff+7) == '\04')) {
+        if (len >= 9 && *buff == SOH && *(buff+5) == STX && (*(buff+7) == ETX || *(buff+7) == EOT)) {
             segment seg;
             to_segment(buff, &seg);
 
