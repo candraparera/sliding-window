@@ -71,6 +71,22 @@ struct __thread_buffer {
 struct sockaddr __os_sender_address;
 int __os_sender_address_size;
 
+void flush_send_buffer(socket_buffer* buff, int sockfd) {
+    char* data = (char*) malloc(256);
+    int len = 0;
+    pthread_mutex_lock(&buff->lock);
+    while (buff->pos > 0 && len < 256) {
+        data[len++] = *buff->buffer;
+        int i = 0;
+        for (; i < buff->pos - 1; i++)
+            buff->buffer[i] = buff->buffer[i+1];
+        buff->pos--;
+    }
+    pthread_mutex_unlock(&buff->lock);
+    sendto(sockfd, data, len, 0, &__os_sender_address, __os_sender_address_size);
+    free(data);
+}
+
 void *__send_buffer_to_os(void* param) {
     int sockfd = ((struct __thread_buffer*) param)->sockfd;
     socket_buffer* buff = ((struct __thread_buffer*) param)->buffer;
@@ -80,18 +96,7 @@ void *__send_buffer_to_os(void* param) {
     memset(data, 0, 256);
     int len = 0;
     while (1) {
-        pthread_mutex_lock(&buff->lock);
-        len = 0;
-        while (buff->pos > 0 && len < 256) {
-            data[len++] = *buff->buffer;
-            int i = 0;
-            for (; i < buff->pos - 1; i++)
-                buff->buffer[i] = buff->buffer[i+1];
-            buff->pos--;
-        }
-        pthread_mutex_unlock(&buff->lock);
-        
-        sendto(sockfd, data, len, 0, &__os_sender_address, __os_sender_address_size);
+        flush_send_buffer(buff, sockfd);
         usleep(rand() % 10000);
     }
     free(data);
