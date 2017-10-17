@@ -11,15 +11,16 @@ typedef struct {
     pthread_mutex_t lock;
 } socket_buffer;
 
-socket_buffer init_buffer(int size);
+socket_buffer* init_buffer(int size);
 
-void free_buffer(socket_buffer buffer);
+void free_buffer(socket_buffer* buffer);
 
-int send_data(socket_buffer send_buff, char* data, int len, char block);
+int send_data(socket_buffer* send_buff, char* data, int len, char block);
 
-int recv_data(socket_buffer recv_buff, char* data, int len, char block);
+int recv_data(socket_buffer* recv_buff, char* data, int len, char block);
 
-void create_send_recv_buffer(int sockfd, pthread_t *send_buff_thread, socket_buffer send_buff,
-                             pthread_t *recv_buff_thread, socket_buffer recv_buff);
+void create_send_recv_buffer(int sockfd, struct sockaddr* addr, pthread_t *send_buff_thread,
+                             socket_buffer* send_buff, pthread_t *recv_buff_thread,
+                             socket_buffer* recv_buff);
 
 #endif
