@@ -29,8 +29,8 @@ Candra Hesen Parera 13515019 -
 Jauhar Arifin 13515049 -
 Rizky Faramita 13515055 -
 
-## Penanganan ADvertised Window Bernilai 0
-Data sewajarnya tidak akan diproses. Window size dengan lebar 0 mengindikasikan bahwa banyaknya segmen yang diambil setiap kali proses pengiriman berlangsung adalah 0. Untuk mengatasi masalah tersebut, dapat dibuat kasus khusus agar ketika pengguna memasukkan window size 0, maka terdapat default number agar data tetap dapat dikirim dengan menggunakan algoritma sliding window.
+## Penanganan Advertised Window Bernilai 0
+Data sewajarnya tidak akan diproses. Window size dengan lebar 0 mengindikasikan bahwa buffer penerima sudah penuh dan jika ada data yang masuk maka akan di-discard. Untuk mengatasi kasus tersebut, pengirim dapat mengirimkan segment kecil berisi satu byte payload secara berkala, jika penerima sudah memiliki kapasitas buffer untuk menampung segment tersebut, maka penerima akan mengirimkan ack dengan advertize window size yang lebih dari nol sehingga proses pengiriman data dapat berlangsung kembali.
 
 ## Field Data pada TCP Header
 1. Source TCP Port Number (2 bytes): bertindak sebagai ujung dari sending device.
