@@ -35,8 +35,8 @@ int send_data(socket_buffer* send_buff, char* data, int len, char block) {
             sent++;
         }
         pthread_mutex_unlock(&send_buff->lock);
-        if (len)
-            usleep(abs(rand() % 10000));
+        //if (len)
+        //    usleep(abs(rand() % 100));
     }
     return sent;
 }
@@ -97,7 +97,7 @@ void *__send_buffer_to_os(void* param) {
     int len = 0;
     while (1) {
         flush_send_buffer(buff, sockfd);
-        usleep(rand() % 10000);
+        //usleep(rand() % 10);
     }
     free(data);
 }
@@ -123,7 +123,7 @@ void *__recv_buffer_from_os(void* param) {
             pthread_mutex_unlock(&buff->lock);
         }
 
-        usleep(rand() % 10000);
+        //usleep(rand() % 100);
     }
     free(data);
 }

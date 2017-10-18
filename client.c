@@ -11,7 +11,7 @@
 #include "buffer.h"
 #include "const.h"
 
-const int TIMEOUT = 1;
+const long long TIMEOUT = 1000000;
 
 void init_socket(int *sockfd) {
     // create a UDP socket
@@ -68,6 +68,7 @@ int main(int argc, char** argv) {
 
     if (buffer_size < 7)
         die("buffer size should be more than 7 bytes");
+    buffer_size = 10240;
 
     // init socket
     init_socket(&sockfd);
@@ -91,7 +92,7 @@ int main(int argc, char** argv) {
     // init window variables
     char *acked_sign = (char*) malloc(window_size * sizeof(char));
     char *message_buff = (char*) malloc(window_size * sizeof(char));
-    int *message_time = (int*) malloc(window_size * sizeof(int));
+    long long *message_time = (long long*) malloc(window_size * sizeof(long long));
     memset(acked_sign, 0, window_size * sizeof(char));
     memset(message_buff, 0, window_size * sizeof(char));
     memset(message_time, 0, window_size * sizeof(int));
@@ -113,99 +114,109 @@ int main(int argc, char** argv) {
     char* buff = (char*) malloc(256);
     memset(buff, 0, 256);
     while(1) {
-        len = recv_data(recv_buffer, buff, 1, 0);
-        if (len == 1)
-            len = recv_data(recv_buffer, buff + 1, 6, 1) + 1;
         
-        // if an ack caught
-        if (len >= 7) {
-            ack_segment seg;
-            to_ack_segment(buff, &seg);
+        int num_try = 10240;
+        while (num_try--) {
+            len = recv_data(recv_buffer, buff, 1, 0);
+            if (len == 1 && (*buff == ACK || *buff == NAK))
+                len = recv_data(recv_buffer, buff + 1, 6, 1) + 1;
             
-            printf("last_acked: %d, last_not_acked: %d\n", last_acked, last_not_acked);
-            printf("%d ack %d caught ", (int) time(0), seg.next_seq);
-            hex(buff, 7);
-            printf("\n");
-            print_ack_segment(seg);
-            fflush(stdout);
-            
-            char checks = checksum_str(buff, 6);
-            // if checksum error, print error log
-            if (checks != seg.checksum) {
-                printf("%d checksum error: calculated %02x, expected %02x\n\r",
-                    (int) time(0), checks & 0xff, seg.checksum & 0xff);
-            } else if (seg.ack == '\06') {
-                // is server receive all?
-                if (seg.next_seq < 0)
-                    break;
+            // if an ack caught
+            if (len >= 7) {
+                ack_segment seg;
+                to_ack_segment(buff, &seg);
                 
-                // normalize sequence number
-                if (seg.next_seq > last_not_acked + 1)
-                    seg.next_seq = last_not_acked + 1;
+                printf("last_acked: %d, last_not_acked: %d\n", last_acked, last_not_acked);
+                printf("%d ack %d caught ", (int) time(0), seg.next_seq);
+                hex(buff, 7);
+                printf("\n");
+                print_ack_segment(seg);
+                fflush(stdout);
+                
+                char checks = checksum_str(buff, 6);
+                // if checksum error, print error log
+                if (checks != seg.checksum) {
+                    printf("%d checksum error: calculated %02x, expected %02x\n\r",
+                        (int) time(0), checks & 0xff, seg.checksum & 0xff);
+                } else if (seg.ack == '\06') {
+                    // is server receive all?
+                    if (seg.next_seq < 0)
+                        break;
+                    
+                    // normalize sequence number
+                    if (seg.next_seq > last_not_acked + 1)
+                        seg.next_seq = last_not_acked + 1;
 
-                // if segment in window range
-                if (seg.next_seq > last_acked && seg.next_seq <= last_not_acked + 1) {
-                    int i = 0;
-                    for (; i < seg.next_seq - last_acked; i++)
-                        acked_sign[i] = 1;
-                    while (last_acked < seg.next_seq - 1) {
-                        last_acked++;
-                        
-                        if (last_char_read != EOF) {
-                            last_char_read = readfd(filed);
-                            last_not_acked++;
-                            if (last_char_read == EOF)
-                                eof_position = last_not_acked;
+                    // if segment in window range
+                    if (seg.next_seq > last_acked && seg.next_seq <= last_not_acked + 1) {
+                        int i = 0;
+                        for (; i < seg.next_seq - last_acked - 1; i++)
+                            acked_sign[i] = 1;
+                        message_time[seg.next_seq - last_acked - 1] = -10000000;
+
+                        while (last_acked < seg.next_seq - 1) {
+                            last_acked++;
+                            
+                            if (last_char_read != EOF) {
+                                last_char_read = readfd(filed);
+                                if (last_char_read == EOF)
+                                    eof_position = last_not_acked;
+                                else
+                                    last_not_acked++;
+                            }
+
+                            shl_buffer(acked_sign, window_size, 1);
+                            shl_buffer(message_buff, window_size, 1);
+                            shl_bufferq(message_time, window_size, 1);
+
+                            if (last_char_read != EOF)
+                                message_buff[last_not_acked - last_acked - 1] = last_char_read;
                         }
-
-                        shl_buffer(acked_sign, window_size, 1);
-                        shl_buffer(message_buff, window_size, 1);
-                        shl_bufferl(message_time, window_size, 1);
-
-                        message_buff[last_not_acked - last_acked - 1] = last_char_read;
+                    } else {
+                        printf("%d segment is discarded because not in window range\n", (int) time(0));
+                        fflush(stdout);
                     }
+                } else if (seg.ack == '\21') {
+                    // resending segment due to NAK
+                    message_time[seg.next_seq - last_acked - 1] = -10000000;
+                    printf("%d segment %d is nacked\n", (int) time(0), seg.next_seq);
+                    fflush(stdout);
                 } else {
-                    printf("%d segment is discarded because not in window range\n", (int) time(0));
+                    // not a valid segment
+                    printf("%d not a valid ack segment\n", (int) time(0));
                     fflush(stdout);
                 }
-            } else if (seg.ack == '\21') {
-                // resending segment due to NAK
-                message_time[seg.next_seq - last_acked - 1] = -1;
-                printf("%d segment %d is nacked\n", (int) time(0), seg.next_seq);
-                fflush(stdout);
-            } else {
-                // not a valid segment
-                printf("%d not a valid ack segment\n", (int) time(0));
-                fflush(stdout);
             }
         }
 
         // sending all segment that need to be sent.
-        int now = (int) time(0);
+        int now = clock();
         int i;
-        for (i = 0; i < last_not_acked - last_acked; i++)
+        // printf("%d sending segments with prop last_acked: %d, last_not_acked: %d\n", (int) time(0), last_acked, last_not_acked);
+        for (i = 0; i < last_not_acked - last_acked; i++) {
+            int seqnum = i + last_acked + 1;
             if (now - message_time[i] >= TIMEOUT && !acked_sign[i]) {
-                int seqnum = i + last_acked + 1;
-
-                if (message_time[i] == -1) {
+                if (message_time[i] < 0) {
                     printf("%d segment %d is nacked\n", (int) time(0), seqnum);
                     fflush(stdout);
                 } else if (message_time[i] > 0) {
                     printf("%d segment %d is timed out\n", (int) time(0), seqnum);
                     fflush(stdout);
                 }
-                printf("%d sending segment %d\n", (int) time(0), seqnum);
+                printf("%d sending segment %d, last_acked: %d, last_not_acked: %d\n", (int) time(0), seqnum, last_acked, last_not_acked);
                 fflush(stdout);
 
                 if (!send_segment(send_buffer, seqnum, message_buff[i], eof_position == seqnum)) {
                     printf("%d failed sending segment %d because the buffer is full\n", (int) time(0), seqnum);
                     fflush(stdout);
                 } else {
-                    message_time[i] = (int) time(0);
+                    message_time[i] = clock();
                     printf("%d segment %d sent\n", (int) time(0), seqnum);
                     fflush(stdout);
                 }
             }
+        }
+        fflush(stdout);
     }
     
     free(acked_sign);
