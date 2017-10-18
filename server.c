@@ -78,6 +78,7 @@ int main(int argc, char** argv) {
         die("Cannot open file");
     
     int last_acked = -1;
+    int last_segment = 2147483647;
     char* acked_status = (char*) malloc(window_size * sizeof(char));
     char* acked_message = (char*) malloc(window_size * sizeof(char));
     memset(acked_status, 0, window_size * sizeof(char));
@@ -87,6 +88,9 @@ int main(int argc, char** argv) {
         char buff[256];
         struct sockaddr_in sender_address;
         int sender_address_size = sizeof(sender_address);
+
+        if (last_acked >= last_segment)
+            break;
 
         len = recv_data(recv_buffer, buff, 1, 0);
         if (len == 1 && buff[0] == '\01')
@@ -131,11 +135,11 @@ int main(int argc, char** argv) {
                 
                 // is this last segment
                 if (seg.etx == '\04') {
-                    send_ack_segment(send_buffer, 1, -1, window_size);
-                    flush_send_buffer(send_buffer, sockfd);
-                    printf("%d send ack of EOF using -1 as sequence number\n", (int) time(0));
+                    // send_ack_segment(send_buffer, 1, -1, window_size);
+                    // flush_send_buffer(send_buffer, sockfd);
+                    printf("%d last segment caught with seq_num: %d\n", (int) time(0), seg.seq);
                     fflush(stdout);
-                    break;
+                    last_segment = seg.seq;
                 }
 
                 if (next_ack > 0) {
@@ -143,7 +147,11 @@ int main(int argc, char** argv) {
                     write(filed, acked_message, next_ack);
 
                     // send next acked segment
-                    send_ack_segment(send_buffer, 1, last_acked + 1 + next_ack, window_size);
+                    int ack_num = last_acked + 1 + next_ack;
+                    if (ack_num > last_segment)
+                        ack_num = -1;
+                    send_ack_segment(send_buffer, 1, ack_num, window_size);
+                    flush_send_buffer(send_buffer, sockfd);
 
                     printf("%d writing to file and sending ack %d\n", (int) time(0), last_acked + 1 + next_ack);
                     fflush(stdout);
