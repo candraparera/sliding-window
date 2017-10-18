@@ -1,12 +1,12 @@
-#TUGAS BESAR IF3130 JARINGAN KOMPUTER
+# TUGAS BESAR IF3130 JARINGAN KOMPUTER
 
-##Petunjuk 
+## Petunjuk 
 1. Lakukan kompilasi dengan pemanggilan perintah ‘make’ pada bash.
 2. Run server terlebih dahulu dengan format ./recvfile <filename> <windowsize> <buffersize> <port>. 
 3. Setelah bash untuk server berhasil dijalankan, buka bash baru untuk menjalankan client.
 4. Jalankan program untuk client dengan format ./sendfile <filename> <windowsize> <buffersize> <destination_ip> <destination_port>.
 
-##Cara Kerja Sliding Window
+## Cara Kerja Sliding Window
 Setelah client mengirimkan data, server akan menerimanya dan memberikan respon berupa ACK untuk setiap paket yang telah diterimanya. Data ACK yang diterima oleh client merupakan sequence number untuk data berikutnya serta ukuran window saat ini. Kemudian client akan menggeser kepala windows ke data dengan sequence number sesuai pada ACK. Berikut merupakan potongan kode dari fungsi main pada sever.c yang mengatur algoritma sliding window pada program:
 
 // slide windows with next_ack
@@ -14,7 +14,7 @@ shl_buffer(acked_message, window_size, next_ack);
 shl_buffer(acked_status, window_size, next_ack);
 last_acked += next_ack;
 
-##Pembagian Tugas
+## Pembagian Tugas
 Bonus: log file.
 Pembacaan data file dari file system.
 Operasi pengiriman data.
@@ -29,10 +29,10 @@ Candra Hesen Parera 13515019 -
 Jauhar Arifin 13515049 -
 Rizky Faramita 13515055 -
 
-##Penanganan ADvertised Window Bernilai 0
+## Penanganan ADvertised Window Bernilai 0
 Data sewajarnya tidak akan diproses. Window size dengan lebar 0 mengindikasikan bahwa banyaknya segmen yang diambil setiap kali proses pengiriman berlangsung adalah 0. Untuk mengatasi masalah tersebut, dapat dibuat kasus khusus agar ketika pengguna memasukkan window size 0, maka terdapat default number agar data tetap dapat dikirim dengan menggunakan algoritma sliding window.
 
-##Field Data pada TCP Header
+## Field Data pada TCP Header
 1. Source TCP Port Number (2 bytes): bertindak sebagai ujung dari sending device.
 2. Destination TCP Port Number (2 bytes): bertindak sebagai ujung dari receiving device.
 3. Sequence Number (4 bytes): bertindak sebagai penanda urutan dari pengiriman paket pesan.
